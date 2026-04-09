@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Model Capture</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #111;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: auto;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #0a84ff;
+      color: white;
+    }
+    #info {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Captura de Modelos</h2>
+
+<div id="reader"></div>
+<button id="startScan">Iniciar escáner</button>
+
+<div id="info">Esperando escaneo...</div>
+
+<input type="file" accept="image/*" capture="environment" id="camera" style="display:none">
+
+<script>
+let currentID = "";
+let currentName = "";
+
+function cleanString(str) {
+  return str
+    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-zA-Z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function onScanSuccess(decodedText) {
+  try {
+    const parts = decodedText.split("|");
+    currentID = parts[0].trim();
+    currentName = parts[1].trim();
+
+    document.getElementById("info").innerText =
+      `ID: ${currentID}\nModelo: ${currentName}`;
+
+    document.getElementById("camera").click();
+
+  } catch (e) {
+    alert("QR inválido. Usar formato: ID|Nombre");
+  }
+}
+
+const html5QrCode = new Html5Qrcode("reader");
+
+document.getElementById("startScan").addEventListener("click", async () => {
+  try {
+    // Verificar si el navegador permite cámara
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Tu navegador no permite usar la cámara desde archivos locales.\nAbrí este HTML desde Chrome o subilo a Drive/hosting.");
+      return;
+    }
+
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      onScanSuccess
+    );
+
+  } catch (err) {
+    alert("No se pudo iniciar la cámara.\nProbá esto:\n- Usar Chrome\n- Abrir desde https (Drive, servidor)\n\nError: " + err);
+  }
+});
+});
+
+document.getElementById("camera").addEventListener("change", function(e) {
+  const file = e.target.files[0];
+  if (!file || !currentID || !currentName) return;
+
+  const cleanName = cleanString(currentName);
+  const filename = `${currentID}_${cleanName}.jpg`;
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(file);
+  link.download = filename;
+  link.click();
+
+  document.getElementById("info").innerText += `\n✔ Foto guardada como ${filename}`;
+});
+</script>
+
+</body>
+</html>
