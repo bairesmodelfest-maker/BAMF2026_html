@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAMF 2026 — Galería de Fotos</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#0a0a0a;color:#eee;min-height:100vh}
+  .header{width:100%;background:#16213e;border-bottom:2px solid #DAA070;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .header h1{color:#DAA070;font-size:1.2em;letter-spacing:.04em}
+  .header p{color:#7EABC0;font-size:.75em;margin-top:2px}
+  .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .badge{background:#1C3156;color:#DAA070;border:1px solid #DAA070;border-radius:20px;padding:4px 12px;font-size:.8em;font-weight:bold;white-space:nowrap}
+  .search-box{padding:8px 14px;background:#0f1a2a;border:1px solid #4a6fa5;color:#eee;border-radius:8px;font-size:.9em;width:200px}
+  .search-box::placeholder{color:#445}
+  .status{text-align:center;padding:40px;color:#7EABC0;font-size:.9em}
+  .progress-wrap{max-width:400px;margin:0 auto;padding:0 20px}
+  .progress-bar-bg{background:#1a2a4a;border-radius:6px;height:8px;overflow:hidden;margin-top:10px}
+  .progress-bar-fill{height:100%;background:#DAA070;width:0%;transition:width .2s}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;padding:20px;max-width:1400px;margin:0 auto}
+  .card{background:#16213e;border:1px solid #0f3460;border-radius:10px;overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s}
+  .card:hover{transform:scale(1.03);border-color:#DAA070}
+  .card img{width:100%;height:170px;object-fit:cover;display:block;background:#0f1a2a}
+  .card-label{padding:7px 10px;font-size:.73em;color:#DAA070;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid #0f3460}
+  .empty{text-align:center;padding:60px 20px;color:#4a6fa5}
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.97);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:zoom-out;padding:20px}
+  .lightbox img{max-width:95vw;max-height:82vh;border-radius:8px;cursor:default}
+  .lightbox-info{margin-top:12px;text-align:center}
+  .lightbox-name{color:#DAA070;font-size:.95em;margin-bottom:10px}
+  .lightbox-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .lb-btn{padding:8px 20px;border-radius:8px;font-weight:bold;font-size:.85em;cursor:pointer;text-decoration:none;border:none}
+  .lb-dl{background:#DAA070;color:#1C3156}
+  .lb-close{background:#333;color:#eee}
+  .lb-nav{position:fixed;top:50%;transform:translateY(-50%);background:rgba(28,49,86,.8);border:1px solid #DAA070;color:#DAA070;font-size:1.5em;padding:10px 14px;cursor:pointer;border-radius:8px;z-index:10000}
+  .lb-nav.left{left:10px}
+  .lb-nav.right{right:10px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🖼️ BAMF 2026 — Galería de Fotos</h1>
+    <p>Actualizá la página para ver las últimas fotos subidas</p>
+  </div>
+  <div class="header-right">
+    <input class="search-box" type="text" id="search" placeholder="🔍 Buscar..." oninput="filtrar()">
+    <span class="badge" id="badge">Cargando...</span>
+    <button onclick="location.reload()" style="background:#1C3156;color:#DAA070;border:1px solid #DAA070;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.85em">🔄 Actualizar</button>
+  </div>
+</div>
+
+<div id="status-area" class="status">
+  <div>Buscando fotos... <span id="prog-txt">0</span></div>
+  <div class="progress-wrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-bar"></div></div>
+  </div>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+var CL_CLOUD  = "dgcyeqydo";
+var CL_FOLDER = "bamf2026";
+var MAX_NUM   = 500; // busca hasta el número 500
+
+var fotosEncontradas = []; // [{num, publicId, nombre}]
+var fotosActuales    = [];
+var indiceActual     = 0;
+var lbEl             = null;
+
+// Verificar si una imagen existe intentando cargarla
+function probarImagen(url){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){ resolve(true); };
+    img.onerror=function(){ resolve(false); };
+    img.src=url;
+    // timeout 3s
+    setTimeout(function(){ resolve(false); }, 3000);
+  });
+}
+
+// Buscar fotos en lotes para no saturar
+async function buscarFotos(){
+  var grid=document.getElementById("grid");
+  var progTxt=document.getElementById("prog-txt");
+  var progBar=document.getElementById("prog-bar");
+  var badge=document.getElementById("badge");
+
+  // Primero intentamos cargar el índice JSON principal
+  try {
+    var r=await fetch("https://res.cloudinary.com/"+CL_CLOUD+"/raw/upload/"+CL_FOLDER+"/fotos_index.json?t="+Date.now());
+    if(r.ok){
+      var lista=await r.json();
+      if(Array.isArray(lista) && lista.length>0){
+        document.getElementById("status-area").style.display="none";
+        lista.forEach(function(publicId){
+          var nombre=publicId.replace(CL_FOLDER+"/","");
+          fotosEncontradas.push({publicId:publicId, nombre:nombre});
+          agregarCard({publicId:publicId, nombre:nombre});
+        });
+        fotosActuales=fotosEncontradas.slice();
+        badge.textContent=fotosEncontradas.length+" fotos";
+        return;
+      }
+    }
+  } catch(e){}
+
+  // Sin índice — buscar índices con timestamp (fotos_index_TIMESTAMP)
+  // usando Admin API
+  var creds=btoa("242125226563199:73JY6l5eQby7XErcyE2MJ4BbArfHpwmM");
+  try {
+    var r2=await fetch("https://api.cloudinary.com/v1_1/dgcyeqydo/resources/raw?prefix="+CL_FOLDER+"/fotos_index&max_results=500&type=upload",{
+      headers:{"Authorization":"Basic "+creds}
+    });
+    if(r2.ok){
+      var data=await r2.json();
+      var archivos=(data.resources||[]).filter(function(f){ return f.public_id.includes("fotos_index"); });
+      // Ordenar por fecha descendente y tomar el más reciente
+      archivos.sort(function(a,b){ return b.created_at.localeCompare(a.created_at); });
+      if(archivos.length>0){
+        var ultimo=archivos[0];
+        var rawUrl="https://res.cloudinary.com/"+CL_CLOUD+"/raw/upload/"+ultimo.public_id;
+        var rj=await fetch(rawUrl+"?t="+Date.now());
+        if(rj.ok){
+          var lista2=await rj.json();
+          if(Array.isArray(lista2) && lista2.length>0){
+            document.getElementById("status-area").style.display="none";
+            lista2.forEach(function(publicId){
+              var nombre=publicId.replace(CL_FOLDER+"/","");
+              fotosEncontradas.push({publicId:publicId,nombre:nombre});
+              agregarCard({publicId:publicId,nombre:nombre});
+            });
+            fotosActuales=fotosEncontradas.slice();
+            badge.textContent=fotosEncontradas.length+" fotos";
+            return;
+          }
+        }
+      }
+    }
+  } catch(e){ console.warn("Admin API:",e); }
+
+  // Sin índice — buscar por URL directa en Cloudinary
+  // Usamos el endpoint de listado público (sin auth) via nombre de carpeta
+  // Intentamos cargar miniaturas para detectar existencia
+  var encontradas=0;
+  var LOTE=20;
+
+  for(var i=1; i<=MAX_NUM; i+=LOTE){
+    var promesas=[];
+    for(var j=i; j<i+LOTE && j<=MAX_NUM; j++){
+      promesas.push((function(num){
+        var numStr=String(num).padStart(3,"0");
+        // URL de thumbnail — si existe devuelve imagen, si no devuelve 404
+        var thumbUrl="https://res.cloudinary.com/"+CL_CLOUD+"/image/upload/w_10/"+CL_FOLDER+"/"+numStr;
+        return fetch(thumbUrl,{method:"HEAD"}).then(function(r){
+          return {num:num, ok:r.ok, url:thumbUrl};
+        }).catch(function(){ return {num:num, ok:false}; });
+      })(j));
+    }
+
+    var resultados=await Promise.all(promesas);
+    resultados.forEach(function(res){
+      if(res.ok){
+        var numStr=String(res.num).padStart(3,"0");
+        // No sabemos el nombre exacto, usamos solo el número
+        var publicId=CL_FOLDER+"/"+numStr;
+        var item={publicId:publicId, nombre:numStr};
+        fotosEncontradas.push(item);
+        agregarCard(item);
+        encontradas++;
+        badge.textContent=encontradas+" fotos encontradas";
+      }
+    });
+
+    // Actualizar progreso
+    progTxt.textContent=Math.min(i+LOTE-1,MAX_NUM)+" / "+MAX_NUM;
+    progBar.style.width=Math.round((Math.min(i+LOTE-1,MAX_NUM)/MAX_NUM)*100)+"%";
+
+    // Si llevamos 20 números consecutivos sin fotos después del 50, parar
+    if(i>50 && encontradas===0 && i>100) break;
+  }
+
+  document.getElementById("status-area").style.display="none";
+  fotosActuales=fotosEncontradas.slice();
+
+  if(fotosEncontradas.length===0){
+    badge.textContent="Sin fotos";
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><div style="font-size:3em">📭</div><div>No hay fotos todavía</div></div>';
+  } else {
+    badge.textContent=fotosEncontradas.length+" fotos";
+  }
+}
+
+function agregarCard(item){
+  var grid=document.getElementById("grid");
+  var thumb="https://res.cloudinary.com/"+CL_CLOUD+"/image/upload/w_300,h_200,c_fill/"+item.publicId+".jpg";
+  var idx=fotosEncontradas.length-1;
+  var card=document.createElement("div");
+  card.className="card";
+  card.dataset.nombre=item.nombre.toLowerCase();
+  card.dataset.idx=idx;
+  card.innerHTML='<img src="'+thumb+'" loading="lazy" alt="'+item.nombre+'">'
+    +'<div class="card-label">'+item.nombre+'</div>';
+  card.onclick=function(){ abrirLightbox(parseInt(this.dataset.idx), fotosActuales); };
+  grid.appendChild(card);
+}
+
+function filtrar(){
+  var q=document.getElementById("search").value.toLowerCase();
+  var cards=document.querySelectorAll(".card");
+  var vis=0;
+  cards.forEach(function(c){
+    var match=c.dataset.nombre.includes(q);
+    c.style.display=match?"":"none";
+    if(match) vis++;
+  });
+  document.getElementById("badge").textContent=vis+" / "+fotosEncontradas.length;
+}
+
+// ── LIGHTBOX ──
+function abrirLightbox(idx, fotos){
+  if(lbEl) lbEl.remove();
+  indiceActual=idx;
+  var f=fotos[idx];
+  lbEl=document.createElement("div");
+  lbEl.className="lightbox";
+  lbEl.onclick=function(e){ if(e.target===lbEl) cerrarLightbox(); };
+
+  if(fotos.length>1){
+    var prev=document.createElement("button");
+    prev.className="lb-nav left"; prev.textContent="‹";
+    prev.onclick=function(e){ e.stopPropagation(); abrirLightbox((indiceActual-1+fotos.length)%fotos.length,fotos); };
+    var next=document.createElement("button");
+    next.className="lb-nav right"; next.textContent="›";
+    next.onclick=function(e){ e.stopPropagation(); abrirLightbox((indiceActual+1)%fotos.length,fotos); };
+    lbEl.appendChild(prev); lbEl.appendChild(next);
+  }
+
+  var rawUrl="https://res.cloudinary.com/"+CL_CLOUD+"/image/upload/"+f.publicId+".jpg";
+  var img=document.createElement("img");
+  img.src=rawUrl; img.onclick=function(e){ e.stopPropagation(); };
+
+  var info=document.createElement("div");
+  info.className="lightbox-info";
+  info.innerHTML='<div class="lightbox-name">'+f.nombre+'</div>'
+    +'<div class="lightbox-btns">'
+    +'<a class="lb-btn lb-dl" href="'+rawUrl+'" download="'+f.nombre+'.jpg" target="_blank" onclick="event.stopPropagation()">⬇️ Descargar</a>'
+    +'<button class="lb-btn lb-close" onclick="cerrarLightbox()">✕ Cerrar</button>'
+    +'</div>';
+
+  lbEl.appendChild(img); lbEl.appendChild(info);
+  document.body.appendChild(lbEl);
+
+  document.onkeydown=function(e){
+    if(e.key==="Escape") cerrarLightbox();
+    if(e.key==="ArrowLeft"&&fotos.length>1) abrirLightbox((indiceActual-1+fotos.length)%fotos.length,fotos);
+    if(e.key==="ArrowRight"&&fotos.length>1) abrirLightbox((indiceActual+1)%fotos.length,fotos);
+  };
+}
+
+function cerrarLightbox(){ if(lbEl){lbEl.remove();lbEl=null;} document.onkeydown=null; }
+
+buscarFotos();
+</script>
+</body>
+</html>
