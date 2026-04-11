@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAMF 2026 — Presentación de Ganadores</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  /* Forzar 16:9 para proyectores — sin scroll, sin recorte */
+  html{width:100%;height:100%;background:#000}
+  body{
+    width:100vw;height:100vh;overflow:hidden;
+    background:#000;font-family:'Segoe UI',sans-serif;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* Contenedor 16:9 que escala manteniendo proporciones */
+  #stage{
+    position:relative;
+    width:100vw;height:56.25vw; /* 16:9 */
+    max-height:100vh;
+    max-width:177.78vh; /* 16:9 inverso */
+    background:#000;overflow:hidden;
+  }
+
+  /* FONDO */
+  #bg-img{
+    position:absolute;inset:0;
+    background-size:cover;background-position:center;
+    opacity:0;transition:opacity 1.4s ease;
+    filter:blur(20px) brightness(.2) saturate(1.5);
+    z-index:0;transform:scale(1.05)
+  }
+  #bg-particles{position:absolute;inset:0;pointer-events:none;z-index:1}
+
+  /* FLASH */
+  #flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:50;pointer-events:none;transition:opacity .2s}
+
+  /* ── INTRO ── */
+  #intro{
+    position:absolute;inset:0;z-index:100;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:#000
+  }
+  .i-logo{font-size:7vw;margin-bottom:.5vw;opacity:0;transition:all 1s ease}
+  .i-logo.show{opacity:1}
+  .i-title{
+    color:#DAA070;font-size:5vw;font-weight:900;letter-spacing:.15em;
+    text-align:center;text-shadow:0 0 4vw rgba(218,160,112,.6);
+    opacity:0;transform:scale(.85);transition:all 1.2s ease
+  }
+  .i-title.show{opacity:1;transform:scale(1)}
+  .i-sub{
+    color:#7EABC0;font-size:1.4vw;margin-top:1vw;letter-spacing:.25em;
+    opacity:0;transition:all .8s ease .5s;text-transform:uppercase;text-align:center
+  }
+  .i-sub.show{opacity:1}
+  .i-btn{
+    margin-top:4vw;background:transparent;border:.15vw solid #DAA070;
+    color:#DAA070;padding:1vw 4vw;font-size:1.2vw;font-weight:900;
+    letter-spacing:.12em;border-radius:.5vw;cursor:pointer;
+    opacity:0;transition:all .8s ease 1s;text-transform:uppercase
+  }
+  .i-btn.show{opacity:1}
+  .i-btn:hover{background:#DAA070;color:#0a0a0a}
+
+  /* ── SLIDE CATEGORÍA ── */
+  #slide{position:absolute;inset:0;z-index:10;display:none}
+
+  /* Layout VERTICAL: foto izq 50%, datos der 50% */
+  #slide.vertical{flex-direction:row;display:flex}
+  #slide.vertical #foto-area{
+    width:50%;height:100%;overflow:hidden;position:relative;flex:none
+  }
+  #slide.vertical #foto-area img{
+    width:100%;height:100%;
+    object-fit:contain; /* contain = sin cortar */
+    object-position:center;
+    background:#000;
+    opacity:0;transition:opacity 1s ease
+  }
+  #slide.vertical #foto-area img.vis{opacity:1}
+  /* Gradiente lateral para fundir con el lado de datos */
+  #slide.vertical #foto-area::after{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent 65%,rgba(0,0,0,.95) 100%);
+    pointer-events:none
+  }
+  #slide.vertical #datos-area{
+    width:50%;height:100%;display:flex;flex-direction:column;
+    justify-content:center;padding:0 5% 0 3%;
+    position:relative;z-index:2;background:transparent
+  }
+
+  /* Layout APAISADO: foto arriba 58%, datos abajo 42% */
+  #slide.apaisado{flex-direction:column;display:flex}
+  #slide.apaisado #foto-area{
+    width:100%;height:58%;overflow:hidden;position:relative;flex:none
+  }
+  #slide.apaisado #foto-area img{
+    width:100%;height:100%;
+    object-fit:contain;
+    object-position:center;
+    background:#000;
+    opacity:0;transition:opacity 1s ease
+  }
+  #slide.apaisado #foto-area img.vis{opacity:1}
+  #slide.apaisado #foto-area::after{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.95) 100%);
+    pointer-events:none
+  }
+  #slide.apaisado #datos-area{
+    width:100%;flex:1;display:flex;flex-direction:column;
+    justify-content:center;align-items:center;text-align:center;
+    padding:1.5% 8%;background:rgba(0,0,0,.6);
+    position:relative;z-index:2
+  }
+
+  /* ── ELEMENTOS DE DATOS ── */
+  .sl-badge{
+    display:inline-block;
+    background:linear-gradient(135deg,#DAA070,#8B4513);
+    color:#fff;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
+    padding:.5vw 1.8vw;border-radius:.4vw;
+    box-shadow:0 0 2vw rgba(218,160,112,.5);
+    font-size:1.1vw;margin-bottom:1.2vw;
+    opacity:0;transform:translateY(-1.5vw);transition:all .6s ease .1s
+  }
+  .sl-badge.in{opacity:1;transform:translateY(0)}
+
+  .sl-cat{
+    font-size:2.8vw;font-weight:900;color:#DAA070;line-height:1.1;
+    margin-bottom:.6vw;
+    opacity:0;transform:translateY(-1vw);transition:all .6s ease .3s
+  }
+  .sl-cat.in{opacity:1;transform:translateY(0)}
+
+  .sl-sep{
+    width:4vw;height:.2vw;
+    background:linear-gradient(90deg,#DAA070,transparent);
+    border-radius:.1vw;margin:1.2vw 0;
+    opacity:0;transition:all .5s ease .5s
+  }
+  /* Para apaisado centrar el sep */
+  #slide.apaisado .sl-sep{margin:1vw auto;background:linear-gradient(90deg,transparent,#DAA070,transparent);width:6vw}
+  .sl-sep.in{opacity:1}
+
+  .sl-modelo{
+    font-size:1.8vw;font-weight:600;color:#fff;
+    line-height:1.2;margin-bottom:1vw;font-style:italic;
+    opacity:0;transform:translateX(-1.5vw);transition:all .6s ease .6s
+  }
+  #slide.apaisado .sl-modelo{transform:translateY(1vw)}
+  .sl-modelo.in{opacity:1;transform:translate(0)}
+
+  .sl-modelista{
+    font-size:2.4vw;font-weight:900;color:#DAA070;
+    line-height:1.1;
+    opacity:0;transform:translateX(-1.5vw);transition:all .6s ease .8s
+  }
+  #slide.apaisado .sl-modelista{transform:translateY(1vw)}
+  .sl-modelista.in{opacity:1;transform:translate(0)}
+
+  /* ── SLIDE FINAL — MEJOR DEL CONCURSO ── */
+  #slide-final{
+    position:absolute;inset:0;z-index:10;
+    display:none;flex-direction:column;
+    align-items:center;justify-content:center;overflow:hidden
+  }
+
+  /* Foto de fondo a pantalla completa con overlay */
+  #fn-bg-foto{
+    position:absolute;inset:0;
+    background-size:cover;background-position:center;
+    filter:brightness(.35) saturate(1.6);
+    transform:scale(1.05)
+  }
+  #fn-overlay{
+    position:absolute;inset:0;
+    background:radial-gradient(ellipse at center,transparent 20%,rgba(0,0,0,.7) 80%);
+  }
+
+  /* Contenido centrado encima */
+  #fn-content{
+    position:relative;z-index:2;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    width:100%;height:100%;padding:2% 5%;text-align:center
+  }
+
+  .fn-corona{font-size:6vw;opacity:0;margin-bottom:.5vw}
+  .fn-titulo-badge{
+    background:linear-gradient(135deg,#DAA070,#8B4513);
+    color:#fff;font-size:1.4vw;font-weight:900;letter-spacing:.2em;
+    text-transform:uppercase;padding:.7vw 3vw;border-radius:.4vw;
+    box-shadow:0 0 3vw rgba(218,160,112,.7);
+    margin-bottom:1.5vw;opacity:0
+  }
+
+  /* Foto del modelo — grande y centrada pero con límite */
+  .fn-foto{
+    width:auto;height:42%;max-width:55%;
+    border-radius:.8vw;overflow:hidden;
+    box-shadow:0 0 6vw rgba(218,160,112,.7),0 0 12vw rgba(218,160,112,.3);
+    border:.25vw solid rgba(218,160,112,.8);
+    margin-bottom:1.5vw;opacity:0;
+    display:flex;align-items:center;justify-content:center
+  }
+  .fn-foto img{width:100%;height:100%;object-fit:contain;background:#000}
+
+  .fn-modelo{
+    font-size:2vw;font-weight:700;color:#fff;
+    font-style:italic;margin-bottom:.6vw;opacity:0;
+    text-shadow:0 0 2vw rgba(0,0,0,.8)
+  }
+  .fn-modelista{
+    font-size:3vw;font-weight:900;color:#DAA070;
+    text-shadow:0 0 3vw rgba(218,160,112,.8),0 0 6vw rgba(218,160,112,.4);
+    opacity:0
+  }
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(3vw)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pulse{0%,100%{text-shadow:0 0 2vw rgba(218,160,112,.5)}50%{text-shadow:0 0 5vw rgba(218,160,112,1),0 0 8vw rgba(218,160,112,.4)}}
+  @keyframes coronaBounce{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.1) rotate(3deg)}}
+
+  /* CONTROLES */
+  #controls{
+    position:absolute;bottom:1.5%;right:1.5%;z-index:200;
+    display:flex;gap:.5vw;opacity:.15;transition:opacity .3s
+  }
+  #controls:hover{opacity:1}
+  #controls button{
+    background:rgba(10,10,10,.95);border:.1vw solid #DAA070;
+    color:#DAA070;padding:.5vw 1vw;border-radius:.4vw;
+    cursor:pointer;font-size:.85vw;font-weight:bold;letter-spacing:.05em
+  }
+  #controls button:hover{background:#DAA070;color:#0a0a0a}
+
+  #slide-counter{
+    position:absolute;top:1.5%;right:1.5%;z-index:200;
+    color:rgba(218,160,112,.4);font-size:.9vw;letter-spacing:.1em
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div id="bg-img"></div>
+  <canvas id="bg-particles"></canvas>
+  <div id="flash"></div>
+
+  <!-- INTRO -->
+  <div id="intro">
+    <div class="i-logo" id="i-logo">🏆</div>
+    <div class="i-title" id="i-title">BAMF 2026</div>
+    <div class="i-sub" id="i-sub">Baires Modelfest · Ganadores del Concurso</div>
+    <button class="i-btn" id="i-btn" onclick="iniciarPresentacion()">▶ Iniciar Presentación</button>
+  </div>
+
+  <!-- SLIDE CATEGORÍA -->
+  <div id="slide">
+    <div id="foto-area"></div>
+    <div id="datos-area"></div>
+  </div>
+
+  <!-- SLIDE FINAL -->
+  <div id="slide-final">
+    <div id="fn-bg-foto"></div>
+    <div id="fn-overlay"></div>
+    <div id="fn-content">
+      <div class="fn-corona" id="fn-corona">🏆</div>
+      <div class="fn-titulo-badge" id="fn-titulo">MEJOR DEL CONCURSO</div>
+      <div class="fn-foto" id="fn-foto"></div>
+      <div class="fn-modelo" id="fn-modelo"></div>
+      <div class="fn-modelista" id="fn-modelista"></div>
+    </div>
+  </div>
+
+  <!-- CONTROLES -->
+  <div id="controls">
+    <button onclick="anteriorSlide()">← Ant</button>
+    <button onclick="siguienteSlide()">Sig →</button>
+    <button onclick="document.getElementById('stage').requestFullscreen&&document.getElementById('stage').requestFullscreen()">⛶ Full</button>
+    <button onclick="salir()">✕</button>
+  </div>
+  <div id="slide-counter"></div>
+
+</div><!-- /stage -->
+
+<script>
+var CL_CLOUD  = "dgcyeqydo";
+var CL_FOLDER = "bamf2026";
+var slides    = [];
+var idxActual = 0;
+
+function sanitizar(str){
+  return String(str||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[ñ]/g,"n").replace(/[Ñ]/g,"N")
+    .replace(/[\\/:*?"<>|]/g,"").replace(/\s+/g," ").trim();
+}
+function padNum(n,d){ return String(parseInt(n)||0).padStart(d,"0"); }
+function urlFoto(orden,modelo){
+  var num=padNum(orden,3);
+  var nombre=sanitizar(modelo);
+  var pid=CL_FOLDER+"/"+num+" "+nombre;
+  return "https://res.cloudinary.com/"+CL_CLOUD+"/image/upload/"+encodeURIComponent(pid)+".jpg";
+}
+function pCls(p){
+  var s=String(p||"").toLowerCase();
+  if(s.indexOf("primer")>=0||s==="1"||s.indexOf("1°")>=0||s.indexOf("1er")>=0) return "p1";
+  if(s.indexOf("segundo")>=0||s==="2"||s.indexOf("2°")>=0||s.indexOf("2do")>=0) return "p2";
+  if(s.indexOf("tercer")>=0||s==="3"||s.indexOf("3°")>=0||s.indexOf("3er")>=0) return "p3";
+  return "p0";
+}
+
+// ── CARGAR DATOS ──
+function cargarDatos(){
+  var t=Date.now();
+  var urls=[
+    "https://res.cloudinary.com/"+CL_CLOUD+"/raw/upload/"+CL_FOLDER+"/presentacion_data.json?t="+t,
+    "https://res.cloudinary.com/"+CL_CLOUD+"/raw/upload/"+CL_FOLDER+"/presentacion_data?t="+t,
+  ];
+  function tryNext(i){
+    if(i>=urls.length) return Promise.reject(new Error("Sin datos"));
+    return fetch(urls[i]).then(function(r){
+      if(!r.ok) return tryNext(i+1);
+      return r.json().catch(function(){ return tryNext(i+1); });
+    }).catch(function(){ return tryNext(i+1); });
+  }
+  return tryNext(0);
+}
+
+// ── CONSTRUIR SLIDES ──
+function construirSlides(data){
+  var porCat={};
+  data.forEach(function(r){
+    if(pCls(r["PREMIO SUGERIDO"])==="p0") return;
+    var cat=(r["Categoría"]||"Sin categoría").trim();
+    var cal=parseFloat(r["CALIFICACIÓN FINAL"])||0;
+    if(!porCat[cat]||cal>porCat[cat].cal) porCat[cat]={r:r,cal:cal};
+  });
+  Object.keys(porCat).sort().forEach(function(cat){
+    slides.push({tipo:"cat",cat:cat,entry:porCat[cat]});
+  });
+  var conPremio=data.filter(function(r){ return pCls(r["PREMIO SUGERIDO"])!=="p0"; });
+  conPremio.sort(function(a,b){ return (parseFloat(b["CALIFICACIÓN FINAL"])||0)-(parseFloat(a["CALIFICACIÓN FINAL"])||0); });
+  if(conPremio.length>0) slides.push({tipo:"final",entry:{r:conPremio[0],cal:parseFloat(conPremio[0]["CALIFICACIÓN FINAL"])||0}});
+}
+
+// ── PARTÍCULAS ──
+function initParticles(){
+  var stage=document.getElementById("stage");
+  var c=document.getElementById("bg-particles");
+  var ctx=c.getContext("2d");
+  c.width=stage.offsetWidth; c.height=stage.offsetHeight;
+  var ps=[];
+  for(var i=0;i<60;i++) ps.push({
+    x:Math.random()*c.width,y:Math.random()*c.height,
+    r:Math.random()*1.5+.3,
+    dx:(Math.random()-.5)*.25,dy:(Math.random()-.5)*.25,
+    a:Math.random()*.5+.1
+  });
+  (function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    ps.forEach(function(p){
+      p.x+=p.dx; p.y+=p.dy;
+      if(p.x<0)p.x=c.width; if(p.x>c.width)p.x=0;
+      if(p.y<0)p.y=c.height; if(p.y>c.height)p.y=0;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle="rgba(218,160,112,"+p.a+")"; ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  })();
+}
+
+// ── INTRO ──
+window.addEventListener("load",function(){
+  initParticles();
+  setTimeout(function(){ document.getElementById("i-logo").classList.add("show"); },200);
+  setTimeout(function(){ document.getElementById("i-title").classList.add("show"); },500);
+  setTimeout(function(){ document.getElementById("i-sub").classList.add("show"); },900);
+  setTimeout(function(){ document.getElementById("i-btn").classList.add("show"); },1200);
+
+  document.getElementById("i-sub").textContent="Cargando datos...";
+  cargarDatos().then(function(data){
+    construirSlides(data);
+    var nCat=slides.filter(function(s){return s.tipo==="cat";}).length;
+    document.getElementById("i-sub").textContent=nCat+" categorías  ·  Gran final: Mejor del Concurso";
+  }).catch(function(){
+    document.getElementById("i-sub").textContent="⚠️ Sin datos — presioná el botón en el dashboard primero";
+  });
+});
+
+function iniciarPresentacion(){
+  if(!slides.length){ alert("Sin datos."); return; }
+  document.getElementById("intro").style.display="none";
+  // Pantalla completa automática
+  var stage=document.getElementById("stage");
+  if(stage.requestFullscreen) stage.requestFullscreen();
+  mostrarSlide(0);
+}
+
+// ── MOSTRAR SLIDE ──
+function mostrarSlide(idx){
+  idxActual=idx;
+  document.getElementById("slide-counter").textContent=(idx+1)+" / "+slides.length;
+  var flash=document.getElementById("flash");
+  flash.style.opacity=".4";
+  setTimeout(function(){ flash.style.opacity="0"; },200);
+  var s=slides[idx];
+  if(s.tipo==="final") mostrarFinal(s.entry);
+  else mostrarCat(s.entry,s.cat);
+}
+
+// ── SLIDE CATEGORÍA ──
+function mostrarCat(entry,cat){
+  document.getElementById("slide-final").style.display="none";
+
+  var r=entry.r;
+  var orden=r["Orden de Participación"]||"";
+  var modelo=r["Nombre del modelo"]||r["Nombre del Modelo"]||"";
+  var modelista=r["Nombre y Apellido"]||"";
+  var fotoUrl=urlFoto(orden,modelo);
+
+  // Fondo
+  var bg=document.getElementById("bg-img");
+  bg.style.backgroundImage="url("+fotoUrl+")";
+  setTimeout(function(){ bg.style.opacity="1"; },50);
+
+  // Detectar orientación antes de mostrar
+  var imgTest=new Image();
+  imgTest.onload=function(){
+    var apaisada=(imgTest.naturalWidth > imgTest.naturalHeight);
+    _renderCat(apaisada, fotoUrl, cat, modelo, modelista);
+  };
+  imgTest.onerror=function(){
+    _renderCat(false, null, cat, modelo, modelista);
+  };
+  imgTest.src=fotoUrl;
+}
+
+function _renderCat(apaisada, fotoUrl, cat, modelo, modelista){
+  var slideEl=document.getElementById("slide");
+  var fa=document.getElementById("foto-area");
+  var da=document.getElementById("datos-area");
+
+  slideEl.className = apaisada ? "apaisado" : "vertical";
+  slideEl.style.display = apaisada ? "flex" : "flex";
+
+  // Foto
+  fa.innerHTML="";
+  if(fotoUrl){
+    var img=document.createElement("img");
+    img.src=fotoUrl;
+    img.onload=function(){ setTimeout(function(){ img.classList.add("vis"); },100); };
+    img.onerror=function(){ fa.innerHTML='<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:5vw;color:#1C3156;background:#0f1a2a">📷</div>'; };
+    fa.appendChild(img);
+  }
+
+  // Datos
+  var datosHTML=
+    '<div class="sl-badge">Mejor trabajo Categoría:</div>'
+    +'<div class="sl-cat">'+cat+'</div>'
+    +'<div class="sl-sep"></div>'
+    +'<div class="sl-modelo">'+modelo+'</div>'
+    +'<div class="sl-modelista">'+modelista+'</div>';
+  da.innerHTML=datosHTML;
+
+  setTimeout(function(){
+    da.querySelectorAll(".sl-badge,.sl-cat,.sl-sep,.sl-modelo,.sl-modelista").forEach(function(el){
+      el.classList.add("in");
+    });
+  },300);
+}
+
+// ── SLIDE FINAL ──
+function mostrarFinal(entry){
+  document.getElementById("slide").style.display="none";
+  var sf=document.getElementById("slide-final");
+  sf.style.display="flex";
+
+  var r=entry.r;
+  var orden=r["Orden de Participación"]||"";
+  var modelo=r["Nombre del modelo"]||r["Nombre del Modelo"]||"";
+  var modelista=r["Nombre y Apellido"]||"";
+  var fotoUrl=urlFoto(orden,modelo);
+
+  // Foto de fondo completa con efecto
+  document.getElementById("fn-bg-foto").style.backgroundImage="url("+fotoUrl+")";
+  document.getElementById("bg-img").style.opacity="0";
+
+  // Foto del modelo centrada y grande
+  var fotoEl=document.getElementById("fn-foto");
+  fotoEl.innerHTML="";
+  var img=document.createElement("img");
+  img.src=fotoUrl;
+  fotoEl.appendChild(img);
+
+  document.getElementById("fn-modelo").textContent=modelo;
+  document.getElementById("fn-modelista").textContent=modelista;
+
+  // Reset animaciones
+  ["fn-corona","fn-titulo","fn-foto","fn-modelo","fn-modelista"].forEach(function(id){
+    var el=document.getElementById(id);
+    el.style.opacity="0";
+    el.style.animation="none";
+    void el.offsetWidth;
+  });
+
+  // Secuencia dramática
+  var seq=[
+    [300,  "fn-corona",    "animation:fadeUp .8s ease forwards, coronaBounce 2s ease-in-out 1s infinite"],
+    [900,  "fn-titulo",    "animation:fadeUp .8s ease forwards"],
+    [1500, "fn-foto",      "animation:fadeUp 1s ease forwards"],
+    [2500, "fn-modelo",    "animation:fadeUp .7s ease forwards"],
+    [3100, "fn-modelista", "animation:fadeUp .8s ease forwards, pulse 2s ease-in-out 1s infinite"],
+  ];
+  seq.forEach(function(step){
+    setTimeout(function(){
+      var el=document.getElementById(step[1]);
+      el.style.cssText+=";"+step[2];
+      el.style.opacity="1";
+    },step[0]);
+  });
+}
+
+// ── NAVEGACIÓN ──
+function siguienteSlide(){
+  if(idxActual<slides.length-1){
+    document.getElementById("bg-img").style.opacity="0";
+    setTimeout(function(){ mostrarSlide(idxActual+1); },400);
+  }
+}
+function anteriorSlide(){
+  if(idxActual>0){
+    document.getElementById("bg-img").style.opacity="0";
+    setTimeout(function(){ mostrarSlide(idxActual-1); },400);
+  }
+}
+function salir(){
+  if(document.fullscreenElement) document.exitFullscreen();
+  if(confirm("¿Salir?")) window.close();
+}
+
+document.addEventListener("keydown",function(e){
+  if(e.key==="ArrowRight"||e.key==="PageDown"||e.key===" ") siguienteSlide();
+  if(e.key==="ArrowLeft"||e.key==="PageUp") anteriorSlide();
+  if(e.key==="Escape"){ if(document.fullscreenElement) document.exitFullscreen(); else salir(); }
+  if(e.key==="f"||e.key==="F"){
+    var stage=document.getElementById("stage");
+    if(stage.requestFullscreen) stage.requestFullscreen();
+  }
+});
+</script>
+</body>
+</html>
